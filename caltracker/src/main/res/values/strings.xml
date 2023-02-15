@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Calorie Goals</string>
+    <string name="tile_description">2 Tight 2 Wear Tile</string>
+    <string name="fitness_tile_label">Calorie progress</string>
+    <string name="goal">of %d cals</string>
+    <string name="goalCals">of 2000 cals</string>
+    <string name="resetCals">redo</string>
+
+    <string name="placeholder_text">2 Tight 2 Wear!</string>
+</resources>
