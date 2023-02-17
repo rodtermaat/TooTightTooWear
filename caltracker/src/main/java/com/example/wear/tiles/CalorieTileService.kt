@@ -15,6 +15,7 @@
  */
 package com.example.wear.tiles
 
+import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.wear.tiles.ActionBuilders
 import androidx.wear.tiles.ColorBuilders.argb
@@ -52,8 +53,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.guava.future
-import android.util.Log
-import kotlinx.coroutines.delay
+//import android.util.Log
+//import androidx.core.content.ContentProviderCompat.requireContext
+//import kotlinx.coroutines.delay
+import android.content.SharedPreferences
 
 
 private const val RESOURCES_VERSION = "1"
@@ -77,36 +80,29 @@ private const val ID_IMAGE_ADD_CALS = "image_add_cals"
 private const val ID_IMAGE_SUB_CALS = "image_sub_cals"
 private const val ID_IMAGE_RESET_CALS = "image_reset_cals"
 
+
 var globalCalCount = 0f
+var globalCalGoal = 2000f
 
+class CalorieTileService : TileService() {
 
-
-class CalorieTileService(private val calorieCalculator: CalorieCalculator = CalorieCalculator()) : TileService() {
     private val serviceScope = CoroutineScope(Dispatchers.IO)
 
     override fun onTileRequest(requestParams: TileRequest) = serviceScope.future {
 
         val deviceParameters = requestParams.deviceParameters!!
 
-        //println(requestParams.state?.lastClickableId.toString())
-        Log.d("WTF",requestParams.state?.lastClickableId.toString() )
+        globalCalCount = loadData()
 
-//        when(requestParams.state?.lastClickableId){
-//            ID_IMAGE_ADD_CALS -> calorieCalculator.incrementCalories()
-//            ID_IMAGE_SUB_CALS -> calorieCalculator.decrementCalories()
-//            ID_IMAGE_RESET_CALS -> calorieCalculator.resetCalories()
-//        }
+        //println(requestParams.state?.lastClickableId.toString())
+        //Log.d("WTF",requestParams.state?.lastClickableId.toString() )
+
 
         when(requestParams.state?.lastClickableId){
             ID_IMAGE_ADD_CALS -> addCalories()
             ID_IMAGE_SUB_CALS -> minusCalories()
             ID_IMAGE_RESET_CALS -> resetCalories()
         }
-
-        //val calorieCount = calorieCalculator.getCalories()
-        //val calorieProgress = calorieCalculator.getCalPercentage()
-
-        ////val deviceParams = requestParams.deviceParameters!!
 
         Tile.Builder()
             .setResourcesVersion(RESOURCES_VERSION)
@@ -115,9 +111,8 @@ class CalorieTileService(private val calorieCalculator: CalorieCalculator = Calo
                 Timeline.Builder().addTimelineEntry(
                     TimelineEntry.Builder().setLayout(
                         Layout.Builder().setRoot(
-                            //layout(calorieCount, calorieProgress, deviceParameters)
                             layout(globalCalCount.toInt(), getCalPercent(), deviceParameters)
-                        ).build()
+                    ).build()
                     ).build()
                 ).build()
             ).build()
@@ -174,14 +169,11 @@ class CalorieTileService(private val calorieCalculator: CalorieCalculator = Calo
                     .addContent(goalCaloriesText(resources.getString(R.string.goalCals), deviceParameters))
                     .addContent(Spacer.Builder().setHeight((VERTICAL_SPACING_HEIGHT)).build())
                     .addContent(Row.Builder()
-                        .addContent(subCalsButton())
+                        .addContent (addButton(ID_IMAGE_SUB_CALS))
                         .addContent (Spacer.Builder().setWidth((HORIZONTAL_SPACING_WIDTH)).build())
-                        .addContent(addCalsButton()).build()).build()
+                        .addContent(addButton(ID_IMAGE_ADD_CALS)).build()).build()
             )
             .build()
-
-
-
 
     // TODO: How to change color of the arc over 1 for when you go over cal goal.
     private fun progressArc(percentage: Float) = Arc.Builder()
@@ -241,12 +233,11 @@ class CalorieTileService(private val calorieCalculator: CalorieCalculator = Calo
             )
             .build()
 
-
-    private fun subCalsButton() =
+    private fun addButton(theButtonID: String) =
         Image.Builder()
             .setWidth(BUTTON_SIZE)
             .setHeight(BUTTON_SIZE)
-            .setResourceId(ID_IMAGE_SUB_CALS)
+            .setResourceId(theButtonID)
             .setModifiers(
                 Modifiers.Builder()
                     .setPadding(
@@ -265,7 +256,7 @@ class CalorieTileService(private val calorieCalculator: CalorieCalculator = Calo
                     )
                     .setClickable(
                         Clickable.Builder()
-                            .setId(ID_IMAGE_SUB_CALS)
+                            .setId(theButtonID)
                             .setOnClick(ActionBuilders.LoadAction.Builder().build())
                             .build()
                     )
@@ -273,53 +264,40 @@ class CalorieTileService(private val calorieCalculator: CalorieCalculator = Calo
             )
             .build()
 
-    private fun addCalsButton() =
-        Image.Builder()
-            .setWidth(BUTTON_SIZE)
-            .setHeight(BUTTON_SIZE)
-            .setResourceId(ID_IMAGE_ADD_CALS)
-            .setModifiers(
-                Modifiers.Builder()
-                    .setPadding(
-                        Padding.Builder()
-                            .setStart(BUTTON_PADDING)
-                            .setEnd(BUTTON_PADDING)
-                            .setTop(BUTTON_PADDING)
-                            .setBottom(BUTTON_PADDING)
-                            .build()
-                    )
-                    .setBackground(
-                        Background.Builder()
-                            .setCorner(Corner.Builder().setRadius(BUTTON_RADIUS).build())
-                            .setColor(argb(ContextCompat.getColor(this, R.color.primaryDark)))
-                            .build()
-                    )
-                    .setClickable(
-                        Clickable.Builder()
-                            .setId(ID_IMAGE_ADD_CALS)
-                            .setOnClick(ActionBuilders.LoadAction.Builder().build())
-                            .build()
-                    )
-                    .build()
-            )
-            .build()
 
-    fun addCalories() {
-        globalCalCount += 25f
+    private fun addCalories() {
+        globalCalCount += 50f
+        saveData(globalCalCount)
     }
 
-    fun minusCalories() {
+    private fun minusCalories() {
         if (globalCalCount != 0f) {
-            globalCalCount -= 25f
+            globalCalCount -= 50f
+            saveData(globalCalCount)
         }
     }
 
-    fun getCalPercent(): Float {
-        return globalCalCount.toFloat()/ CalorieCalculator.CALORIE_GOAL.toFloat()
+    private fun getCalPercent(): Float {
+        return globalCalCount/ globalCalGoal
     }
 
-    fun resetCalories() {
+    private fun resetCalories() {
         globalCalCount = 0f
+        saveData(globalCalCount)
+    }
+
+    private fun saveData(theData: Float) {
+        val sharedPreferences: SharedPreferences = getSharedPreferences("sharedPrefs", Context.MODE_PRIVATE)
+        val editor:SharedPreferences.Editor = sharedPreferences.edit()
+        editor.apply(){
+            putFloat("CAL_KEY", theData)
+        }.apply()
+    }
+
+    private fun loadData(): Float {
+        val sharedPreferences: SharedPreferences = getSharedPreferences("sharedPrefs", Context.MODE_PRIVATE)
+        val savedCals : Float = sharedPreferences.getFloat("CAL_KEY", 0f)
+        return savedCals
     }
 
 }
